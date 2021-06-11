@@ -49,10 +49,12 @@ def convertFile(filename, label):
     clus_targetE = gu.loadVectorBranchFlat('cluster_ENG_CALIB_TOT', tree)
 
     ## Now, setup selections
-    eta_mask = (abs(clus_eta) < 0.7) | (abs(clus_eta) > .6)
+    #eta_mask = (abs(clus_eta) < 0.7) | (abs(clus_eta) > .6)
     e_mask = clus_e > 0.5
 
-    selection = eta_mask & e_mask
+    selection = e_mask # & eta_mask
+    
+    print('eta', clus_eta[:10])
 
     ## Now, normalize
     print('Normalizing')    
@@ -60,7 +62,7 @@ def convertFile(filename, label):
     cell_eta = np.nan_to_num(cell_eta - clus_eta[:, None])
     cell_phi = np.nan_to_num(cell_phi - clus_phi[:, None])
     #normalize energy by taking log
-    cell_e = np.nan_to_num(np.log(cell_e))
+    cell_e = np.nan_to_num(np.log(cell_e), posinf = 0, neginf=0)
     #normalize sampling by 0.1
     cell_samp = cell_samp * 0.1
 
@@ -68,15 +70,16 @@ def convertFile(filename, label):
     #prepare outputs
     X = np.stack((cell_e[selection],
                     cell_eta[selection],
-                    cell_phi[selection]),
+                    cell_phi[selection],
+                    cell_samp[selection]),
                     axis = 2)
 
-    Y_label = to_categorical(np.ones(len(X)) * label)
-    Y_target = np.log(clus_targetE[selection])
+    Y_label = np.ones(len(X)) * label
+    Y_target = np.log(clus_targetE[selection]) #for regression, I don't need
 
     #Now we save. prepare output filename.
     outname = filename.replace('root', 'npz')
-    np.savez(outname, X=X, Y_label=Y_label, Y_target=Y_target)
+    np.savez(outname, X=X, Y_label=Y_label, Y_target=Y_target, clus_eta = clus_eta[selection])
     print('Done! {}'.format(outname))
 
 
