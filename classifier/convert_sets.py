@@ -43,8 +43,11 @@ def convertFile(filename, label):
 
     clus_phi = gu.loadVectorBranchFlat('cluster_Phi', tree)
     clus_eta = gu.loadVectorBranchFlat('cluster_Eta', tree)
+    clus_pt = gu.loadVectorBranchFlat('cluster_Pt', tree)
 
     clus_e   = gu.loadVectorBranchFlat('cluster_E', tree)
+    
+    clus_e_t = clus_e / np.cosh(np.array(clus_eta))
 
     clus_targetE = gu.loadVectorBranchFlat('cluster_ENG_CALIB_TOT', tree)
 
@@ -79,7 +82,7 @@ def convertFile(filename, label):
 
     #Now we save. prepare output filename.
     outname = filename.replace('root', 'npz')
-    np.savez(outname, X=X, Y_label=Y_label, Y_target=Y_target, clus_eta = clus_eta[selection])
+    np.savez(outname, X=X, Y_label=Y_label, Y_target=Y_target, clus_eta=clus_eta[selection], clus_e=clus_e[selection], clus_pt=clus_pt[selection], clus_e_t=clus_e_t[selection])
     print('Done! {}'.format(outname))
 
 
