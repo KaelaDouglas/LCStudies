@@ -22,6 +22,11 @@ import plot_util as pu
 
 from scipy.interpolate import interp1d
 
+data_path = '/fast_scratch/atlas_images/v01-45/' 
+
+#this is the no global params model
+model_nog = tf.keras.models.load_model(data_path+'w6_pfn_noglob.hdf5')
+
 def GlobalModel(X_train, X_val, X_test, Y_train, Y_val, Y_test, X_glob_tr, X_glob_val, X_glob_te, epochs, batch_size, num_glob, filename, fsize):
     #for now, try all three global features in X_glob okay?! 
     #one function to run the model & create the metrics
@@ -45,7 +50,7 @@ def GlobalModel(X_train, X_val, X_test, Y_train, Y_val, Y_test, X_glob_tr, X_glo
    
     return history
 
-def metrics(model, X_te, X_globte, select):
+def metrics(model, X_te, X_globte, Y_test, select):
     #make metrics
     X_1, X_2 = X_te, X_globte
     fps = []
@@ -96,7 +101,7 @@ def plots1(ranges, aucs, aucs_ng, reg95, reg95_ng, rangename='eta', globalpars='
     ax2.plot(ranges, reg95, linewidth=3, c='xkcd:dark sand', marker='o', label='global '+globalpars)
     ax2.plot(ranges, reg95_ng, linewidth=3, c='xkcd:pale peach', marker='o', label='no global features')
     ax2.set_xlabel('absolute range in '+rangename)
-    ax2.set_ylabel('Rejection at 95% efficiency')
+    ax2.set_ylabel('Rejection at 95\% efficiency')
     ax2.legend()
     
 def histplots(history):
@@ -254,13 +259,13 @@ def AUCplot(rang, fps, tps, auc, rangetype='eta'):
     
     
 #make metrics for the no global model, these will be universal
-def metrics_ng(X_test, selections):
+def metrics_ng(model, X_test, Y_test, selections):
 
     fps_ng = []
     tps_ng = []
     aucs_ng = []
     for selection in selections:
-        preds = model_nog.predict(X_test[selection], batch_size=1000) 
+        preds = model.predict(X_test[selection], batch_size=1000) 
         pfn_fp, pfn_tp, threshs = roc_curve(Y_test[selection][:,1], preds[:,1])
 
         fps_ng.append(pfn_fp)
@@ -271,3 +276,19 @@ def metrics_ng(X_test, selections):
         aucs_ng.append(auc)
         print('PFN AUC:', auc)
     return fps_ng, tps_ng, aucs_ng
+
+def model_noglob(X_train, X_val, X_test, Y_train, Y_val, Y_test, epochs, batch_size, filename):
+    #run the model & create the metrics
+    
+    Phi_sizes, F_sizes = (100, 100, 128), (100, 100, 100)
+   
+    #make the model:
+    pfn = PFN(input_dim=X_train.shape[-1], Phi_sizes=Phi_sizes, F_sizes=F_sizes)#, num_global_features =1)
+    
+    #try callbacks:
+    callback = tf.keras.callbacks.ModelCheckpoint(data_path+filename, save_best_only=True)
+    
+    # train model
+    history = pfn.fit(X_train, Y_train, epochs=epochs, batch_size=batch_size, validation_data=(X_val, Y_val), verbose=1, callbacks=[callback])
+    
+    return history
