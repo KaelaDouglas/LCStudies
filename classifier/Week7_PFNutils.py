@@ -264,9 +264,11 @@ def metrics_ng(model, X_test, Y_test, selections):
     fps_ng = []
     tps_ng = []
     aucs_ng = []
+    preds_ng = []
     for selection in selections:
         preds = model.predict(X_test[selection], batch_size=1000) 
         pfn_fp, pfn_tp, threshs = roc_curve(Y_test[selection][:,1], preds[:,1])
+        preds_ng.append(preds)
 
         fps_ng.append(pfn_fp)
         tps_ng.append(pfn_tp)
@@ -275,7 +277,7 @@ def metrics_ng(model, X_test, Y_test, selections):
         auc = roc_auc_score(Y_test[selection][:,1], preds[:,1])
         aucs_ng.append(auc)
         print('PFN AUC:', auc)
-    return fps_ng, tps_ng, aucs_ng
+    return fps_ng, tps_ng, aucs_ng, preds_ng
 
 def model_noglob(X_train, X_val, X_test, Y_train, Y_val, Y_test, epochs, batch_size, filename):
     #run the model & create the metrics
@@ -292,3 +294,62 @@ def model_noglob(X_train, X_val, X_test, Y_train, Y_val, Y_test, epochs, batch_s
     history = pfn.fit(X_train, Y_train, epochs=epochs, batch_size=batch_size, validation_data=(X_val, Y_val), verbose=1, callbacks=[callback])
     
     return history
+
+def ratio_plot(AUC, REG95, auc_nog, reg95_nog, eta_ranges):
+    #first two are for model you want to examine, second two are for the no-glob model you want to compare it to(or use some other model as the baseline if you want, like global eta only)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[12, 6])
+
+    ax1.set_xlim(0., 3.1)
+    ax1.set_ylabel('model AUC divided by no global features model AUC', fontsize=15)
+    ax1.plot(eta_ranges, np.array(AUC)/np.array(auc_nog), c='xkcd:goldenrod', linewidth=2, marker='o', label='no ID, global $\eta$')
+    ax1.set_xlabel('range in |$\eta$|')
+    ax1.legend()
+
+    ax2.set_xlim(0., 3.1)
+    ax2.set_ylabel('model rejection at 95\% effeciency/ no-glob rejection', fontsize=15)
+    ax2.plot(eta_ranges, np.array(REG95)/np.array(reg95_nog), c='xkcd:golden', linewidth=2, marker='o', label='no ID, global $\eta$')
+    ax2.set_xlabel('range in |$\eta$|')
+    ax2.legend()
+    
+#turn this into a util function:
+def scorehist(preds, Y_test, eta_test):
+    prob1, prob2 = preds.T
+    lab1, lab2 = Y_test.T
+    pip_mask = lab1 == 1 #note I'm not sure if I have these mixed up or not it might be the other way around lol
+    pi0_mask = lab1 == 0
+    pi0_pred = prob1[pi0_mask]
+    pip_pred = prob1[pip_mask]
+    
+    #I still think I need both eta bins tho I'm sure there's a nicer way to do this
+    eta_pi0 = eta_test[pi0_mask]
+    eta_pip = eta_test[pip_mask]
+
+    selec1 = abs(eta_pi0) < 0.5
+    selec2 = (abs(eta_pi0) >= .5) & (abs(eta_pi0) < 1.)
+    selec3 = (abs(eta_pi0) >= 1.) & (abs(eta_pi0) < 1.5)
+    selec4 = (abs(eta_pi0) >= 1.5) & (abs(eta_pi0) < 2.)
+    selec5 = (abs(eta_pi0) >= 2.) & (abs(eta_pi0) < 2.5)
+    selec6 = (abs(eta_pi0) >= 2.5) & (abs(eta_pi0) < 3.1)
+
+    eta_bins_0 = [selec1, selec2, selec3, selec4, selec5, selec6]
+
+    selec1 = abs(eta_pip) < 0.5
+    selec2 = (abs(eta_pip) >= .5) & (abs(eta_pip) < 1.)
+    selec3 = (abs(eta_pip) >= 1.) & (abs(eta_pip) < 1.5)
+    selec4 = (abs(eta_pip) >= 1.5) & (abs(eta_pip) < 2.)
+    selec5 = (abs(eta_pip) >= 2.) & (abs(eta_pip) < 2.5)
+    selec6 = (abs(eta_pip) >= 2.5) & (abs(eta_pip) < 3.1)
+
+    eta_bins_p = [selec1, selec2, selec3, selec4, selec5, selec6]
+    
+    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2,3,figsize=[24,16])
+    axes = [ax1, ax2, ax3, ax4, ax5, ax6]
+    ranges = ['|$\eta$| < .5', '.5< |$\eta$| < 1.', '1.< |$\eta$| < 1.5', '1.5< |$\eta$| < 2.', '2.< |$\eta$| < 2.5', '2.5< |$\eta$| < 3.']
+
+    for i in range(len(eta_bins_0)):
+        axes[i].set_xlim(0,1)
+        axes[i].set_ylim(0,3e4)
+        axes[i].set_title(ranges[i])
+        axes[i].hist(pip_pred[eta_bins_p[i]], color='xkcd:light mustard', label='pi+/-')
+        axes[i].hist(pi0_pred[eta_bins_0[i]], color='xkcd:ochre', label='pi0')
+        axes[i].legend()
