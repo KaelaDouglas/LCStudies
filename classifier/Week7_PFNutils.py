@@ -350,6 +350,6 @@ def scorehist(preds, Y_test, eta_test):
         axes[i].set_xlim(0,1)
         axes[i].set_ylim(0,3e4)
         axes[i].set_title(ranges[i])
-        axes[i].hist(pip_pred[eta_bins_p[i]], color='xkcd:light mustard', label='pi+/-')
-        axes[i].hist(pi0_pred[eta_bins_0[i]], color='xkcd:ochre', label='pi0')
+        axes[i].hist(pip_pred[eta_bins_p[i]], color='xkcd:light mustard', label='true pi+/-')
+        axes[i].hist(pi0_pred[eta_bins_0[i]], color='xkcd:ochre', label=' true pi0')
         axes[i].legend()
