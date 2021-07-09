@@ -89,7 +89,7 @@ def to_xyz(_coords):
     return np.column_stack([cell_x,cell_y,cell_z])
 
 def plottracks(cluster_xyz, tracks_xyz): #more useful like this I'd say
-    colors = ['xkcd:burnt yellow', 'xkcd:indian red', 'xkcd:greyish', 'xkcd:hazel',  'xkcd:light gold', 'xkcd:tomato', 'xkcd:brownish pink']
+    colors = ['xkcd:burnt yellow', 'xkcd:indian red', 'xkcd:greyish', 'xkcd:mud brown', 'xkcd:tomato', 'xkcd:brownish pink', 'xkcd:pumpkin orange', 'xkcd:peachy pink', 'xkcd:dried blood'] #these are just for different clusters, need more than this!
 
     fig = plt.figure(figsize=(8,8))
     ax = fig.add_subplot(projection='3d')
@@ -204,11 +204,11 @@ def run(event_dict, geo_dict, track_dict, idx_dict):
         clusters.append(_cluster)
 
     print('Number of Clusters: '+str(len(clusters)))
-    print('Number in each:') #of cells in each??
+    print('Number of cells in each Cluster:') 
     for n in range(len(clusters)):
         print(len(clusters[n])) #okay cool good to know
     
-    barrel_layer_rPerp = np.array([1540., 1733., 1930., 2450., 3010., 3630.]) #why these numbers?
+    barrel_layer_rPerp = np.array([1540., 1733., 1930., 2450., 3010., 3630.]) #Cells in the same sampling layer (eg EMB1) have different rPerp values. these numbers were from a previous data exploration notebook where I found a statistical average. because there is no rPerp for tracks I had to just insert an average value for the different barrel layers - hence why it only works currently for central tracks. will be updated!! (rperp is the distance from the beam line)
 
     n_tracks = event_dict['nTrack'][event]
     print('Number of tracks: '+str(n_tracks))
@@ -222,7 +222,7 @@ def run(event_dict, geo_dict, track_dict, idx_dict):
             i += 1
         track = np.reshape(track, (6,2))
         trackP = np.full(6, event_dict['trackP'][event][t])
-        track = np.column_stack((trackP, track, barrel_layer_rPerp, np.array([1,2,3,12,13,14])))#why these numbers?
+        track = np.column_stack((trackP, track, barrel_layer_rPerp, np.array([1,2,3,12,13,14])))#these numbers are integers that identify the calorimeters!
         tracks.append(track)
         
     #convert data:
