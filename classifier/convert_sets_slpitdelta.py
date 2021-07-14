@@ -13,18 +13,24 @@ import graph_util as gu
 #data_path = '/Users/swiatlow/Data/caloml/graph_data/'
 data_path = '/fast_scratch/atlas_images/v01-45/'
 
-rho_list = [data_path+ 'delta_medium.root']
+del_list = [data_path+ 'delta_medium.root']
 
 def convertFile(filename):
     print('Working on {}'.format(filename))
+    
+    rb = ['cluster_cell_ID', 'cluster_cell_E', 'cluster_Phi', 'cluster_Eta', 'cluster_Pt', 'truthPartPdgId',
+               'cluster_E']
     
     tree = ur.open(filename)['EventTree']
     geotree = ur.open(filename)['CellGeo']
 
     geo_dict = gu.loadGraphDictionary(geotree)
+    
 
     print('Loading data')
     # should I remove things over 2000?
+    
+    
 
     ## First, load all information we want
     cell_id = gu.loadArrayBranchFlat('cluster_cell_ID', tree, 2000)
@@ -77,8 +83,8 @@ def convertFile(filename):
     np.savez(outname, X=X, clus_eta=clus_eta[selection], clus_e=clus_e[selection], clus_pt=clus_pt[selection], clus_e_t=clus_e_t[selection], ID = ID)
     print('Done! {}'.format(outname))
 
-for rho_file in rho_list:
-    convertFile(rho_file)
+for del_file in del_list:
+    convertFile(del_file)
 
 
 
