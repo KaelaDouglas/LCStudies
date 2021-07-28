@@ -353,3 +353,56 @@ def scorehist(preds, Y_test, eta_test):
         axes[i].hist(pip_pred[eta_bins_p[i]], color='xkcd:light mustard', label='true pi+/-')
         axes[i].hist(pi0_pred[eta_bins_0[i]], color='xkcd:ochre', label=' true pi0')
         axes[i].legend()
+        
+        
+def deltaR_plots(DR_ranges, predics, col):
+    #plotting funciton for the below function; plot predicted probabilities as function of deltaR
+    fig, ((ax1, ax2, ax3, ax7), (ax4, ax5, ax6, ax8)) = plt.subplots(2,4,figsize=[24,12])
+    axes = [ax1, ax2, ax3, ax7, ax4, ax5, ax6, ax8]
+    ranges = ['$\Delta R$ <' + str(np.round(DR_ranges[1], 4)), str(np.round(DR_ranges[1], 4))+ ' < $\Delta R$ < ' + str(np.round(DR_ranges[2], 4)), str(np.round(DR_ranges[2], 4)) + ' < $\Delta R$ < '+ str(np.round(DR_ranges[3], 4)), str(np.round(DR_ranges[3], 4))+' < $\Delta R$ < '+ str(np.round(DR_ranges[4], 4)), str(np.round(DR_ranges[4], 4))+' < $\Delta R$ < '+ str(np.round(DR_ranges[5], 4)), str(np.round(DR_ranges[5], 4))+' < $\Delta R$ < '+ str(np.round(DR_ranges[6], 4)), str(np.round(DR_ranges[6], 4))+' < $\Delta R$ < '+ str(np.round(DR_ranges[7],4)), str(np.round(DR_ranges[7], 4))+' < $\Delta R$ < '+ str(np.round(DR_ranges[8], 4))]
+
+    for i in range(len(axes)):
+        prob1, prob2 = predics[i].T
+        axes[i].set_xlim(0,1)
+        #axes[i].set_ylim(0,3e4)
+        axes[i].set_title(ranges[i])
+        axes[i].hist(prob1, color=col)
+        
+
+def deltaR_responseplots(file, model, col):
+    #guess I'm just adding everything here, so here's the function to make a plot of the predictions of testing a (no-glob) model as a funciton of deltaR . Just give it the file with the data, the model to use, and a colour to plot
+    X_test = file['arr_2']
+    eta_test = file['arr_5']
+    delR_test = file['arr_17']
+
+    DR_ranges = np.linspace(0., max(delR_test)+.1, 9) #includes stop
+
+    DR_sel = [abs(delR_test) < DR_ranges[1]]
+    for i in range(1, len(DR_ranges)):
+        selec_ = (abs(delR_test) >= DR_ranges[i-1]) & (abs(delR_test) < DR_ranges[i])
+        DR_sel.append(selec_)
+
+    predics = []
+    for selection in DR_sel:
+        preds = model_nog.predict(X_test[selection], batch_size=1000)
+        predics.append(preds)
+        
+    deltaR_plots(DR_ranges, predics, col=col)
+    
+def datatofile(dat, outfile, size):
+    X, clus_eta, clus_pt, clus_E, clus_et, deltar = dat
+    X_all = np.array(X[:size])
+    eta_all = np.array(clus_eta[:size])
+    pt_all = np.array(clus_pt[:size])
+    E_all = np.array(clus_E[:size])
+    et_all = np.array(clus_et[:size])
+    deltar_all = np.array(deltar[:size])
+
+    (X_train, X_val, X_test,  
+     eta_train, eta_val, eta_test, 
+     ET_train, ET_val, ET_test, 
+     pt_train, pt_val, pt_test, 
+     Eng_train, Eng_val, Eng_test,
+     deltar_train, deltar_val, deltar_test) = data_split(X_all, eta_all, et_all, pt_all, E_all, deltar_all, val=100, test=int(size/2.))
+
+    np.savez(data_path+outfile, X_train, X_val, X_test, eta_train, eta_val, eta_test, ET_train, ET_val, ET_test, pt_train, pt_val, pt_test, Eng_train, Eng_val, Eng_test, deltar_train, deltar_val, deltar_test)
