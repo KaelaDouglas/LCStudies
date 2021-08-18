@@ -22,14 +22,18 @@ import plot_util as pu
 
 from scipy.interpolate import interp1d
 
+import atlas_mpl_style as ampl #makes matplotlib follow atlas formal style
+ampl.use_atlas_style()
+
 data_path = '/fast_scratch/atlas_images/v01-45/' 
 
 #this is the no global params model
 model_nog = tf.keras.models.load_model(data_path+'w6_pfn_noglob.hdf5')
 
-def GlobalModel(X_train, X_val, X_test, Y_train, Y_val, Y_test, X_glob_tr, X_glob_val, X_glob_te, epochs, batch_size, num_glob, filename, fsize):
+def GlobalModel(X_train, X_val, X_test, Y_train, Y_val, Y_test, X_glob_tr, X_glob_val, X_glob_te, epochs, batch_size, num_glob, filename, fsize, nClass=2):
     #for now, try all three global features in X_glob okay?! 
     #one function to run the model & create the metrics
+    #nClass is just the number of classifications!!
     
     Phi_sizes, F_sizes = (100, 100, 128), (fsize, fsize, fsize) #F affects the global features, so try increasing?
     # F initially was (100,100,100)
@@ -40,7 +44,7 @@ def GlobalModel(X_train, X_val, X_test, Y_train, Y_val, Y_test, X_glob_tr, X_glo
     X_te = [X_test, X_glob_te]
     
     #make the model:
-    pfn = PFN(input_dim=X_train.shape[-1], Phi_sizes=Phi_sizes, F_sizes=F_sizes, num_global_features =num_glob)
+    pfn = PFN(input_dim=X_train.shape[-1], Phi_sizes=Phi_sizes, F_sizes=F_sizes, num_global_features=num_glob, output_dim=nClass)
     
     #try callbacks:
     callback = tf.keras.callbacks.ModelCheckpoint(data_path+filename, save_best_only=True)
@@ -57,11 +61,12 @@ def metrics(model, X_te, X_globte, Y_test, select):
     tps = []
     threshss = []
     aucs = []
+    predics = []
     for selection in select:
         X_interm = [X_1[selection], X_2[selection]] #YAY got it working!! just had to split it up to make the selection
         preds = model.predict(X_interm, batch_size=1000) 
         pfn_fp, pfn_tp, threshs = roc_curve(Y_test[selection][:,1], preds[:,1])
-        
+        predics.append(preds)
         fps.append(pfn_fp)
         tps.append(pfn_tp)
         threshss.append(threshs)
@@ -71,7 +76,7 @@ def metrics(model, X_te, X_globte, Y_test, select):
         aucs.append(auc)
         print('PFN AUC:', auc)
         
-    return fps, tps, aucs
+    return fps, tps, aucs, predics
 
 def interp95(fps, tps):
     fg = []
@@ -315,8 +320,8 @@ def ratio_plot(AUC, REG95, auc_nog, reg95_nog, eta_ranges):
 def scorehist(preds, Y_test, eta_test):
     prob1, prob2 = preds.T
     lab1, lab2 = Y_test.T
-    pip_mask = lab1 == 1 #note I'm not sure if I have these mixed up or not it might be the other way around lol
-    pi0_mask = lab1 == 0
+    pi0_mask = lab1 == 1 #note I'm not sure if I have these mixed up or not it might be the other way around lol
+    pip_mask = lab1 == 0
     pi0_pred = prob1[pi0_mask]
     pip_pred = prob1[pip_mask]
     
@@ -355,39 +360,50 @@ def scorehist(preds, Y_test, eta_test):
         axes[i].legend()
         
         
-def deltaR_plots(DR_ranges, predics, col):
+def deltaR_plots(DR_ranges, predics, col, CC):
     #plotting funciton for the below function; plot predicted probabilities as function of deltaR
     fig, ((ax1, ax2, ax3, ax7), (ax4, ax5, ax6, ax8)) = plt.subplots(2,4,figsize=[24,12])
     axes = [ax1, ax2, ax3, ax7, ax4, ax5, ax6, ax8]
     ranges = ['$\Delta R$ <' + str(np.round(DR_ranges[1], 4)), str(np.round(DR_ranges[1], 4))+ ' < $\Delta R$ < ' + str(np.round(DR_ranges[2], 4)), str(np.round(DR_ranges[2], 4)) + ' < $\Delta R$ < '+ str(np.round(DR_ranges[3], 4)), str(np.round(DR_ranges[3], 4))+' < $\Delta R$ < '+ str(np.round(DR_ranges[4], 4)), str(np.round(DR_ranges[4], 4))+' < $\Delta R$ < '+ str(np.round(DR_ranges[5], 4)), str(np.round(DR_ranges[5], 4))+' < $\Delta R$ < '+ str(np.round(DR_ranges[6], 4)), str(np.round(DR_ranges[6], 4))+' < $\Delta R$ < '+ str(np.round(DR_ranges[7],4)), str(np.round(DR_ranges[7], 4))+' < $\Delta R$ < '+ str(np.round(DR_ranges[8], 4))]
-
+    
     for i in range(len(axes)):
-        prob1, prob2 = predics[i].T
+        prob1, prob2 = predics[i].T #prob1 describes probability of it being a pi0, prob2 = probability of it being pipm!
         axes[i].set_xlim(0,1)
-        #axes[i].set_ylim(0,3e4)
-        axes[i].set_title(ranges[i])
-        axes[i].hist(prob1, color=col)
+        axes[i].set_ylabel('Counts')
+        axes[i].set_title(ranges[i], fontsize=25)
+        if np.isnan(prob1).all(): #finally got it working!!!! just a spicy bit of error management. if there's an empty
+            axes[i].plot([])    # bin, just don't plot anything. Honestly crazy it was this hard to get that to work
+        else:
+            axes[i].hist(prob1, color=col)
         
+    fig.suptitle(str(CC), fontsize=30)
+    plt.show()
 
-def deltaR_responseplots(file, model, col):
+def deltaR_responseplots(file, model, col, CC = None):
     #guess I'm just adding everything here, so here's the function to make a plot of the predictions of testing a (no-glob) model as a funciton of deltaR . Just give it the file with the data, the model to use, and a colour to plot
     X_test = file['arr_2']
     eta_test = file['arr_5']
     delR_test = file['arr_17']
-
+    
     DR_ranges = np.linspace(0., max(delR_test)+.1, 9) #includes stop
-
-    DR_sel = [abs(delR_test) < DR_ranges[1]]
+     
+    DR_sel = []
     for i in range(1, len(DR_ranges)):
         selec_ = (abs(delR_test) >= DR_ranges[i-1]) & (abs(delR_test) < DR_ranges[i])
         DR_sel.append(selec_)
-
+    
     predics = []
     for selection in DR_sel:
-        preds = model_nog.predict(X_test[selection], batch_size=1000)
-        predics.append(preds)
-        
-    deltaR_plots(DR_ranges, predics, col=col)
+        #print(np.array(X_test[selection]).nbytes/1024000, 'GB')
+        #print(np.array(X_test[selection]).shape)
+        #new = np.empty(np.array(X_test[selection]).shape)
+        #np.copyto(src=np.array(X_test[selection]), dst=new)
+        if len(X_test[selection]) ==0:
+            predics.append(np.array([np.nan, np.nan])) #error management
+        else:
+            preds = model.predict(X_test[selection], batch_size=100)
+            predics.append(preds)
+    deltaR_plots(DR_ranges, predics, col=col, CC=CC)
     
 def datatofile(dat, outfile, size):
     X, clus_eta, clus_pt, clus_E, clus_et, deltar = dat
@@ -406,3 +422,72 @@ def datatofile(dat, outfile, size):
      deltar_train, deltar_val, deltar_test) = data_split(X_all, eta_all, et_all, pt_all, E_all, deltar_all, val=100, test=int(size/2.))
 
     np.savez(data_path+outfile, X_train, X_val, X_test, eta_train, eta_val, eta_test, ET_train, ET_val, ET_test, pt_train, pt_val, pt_test, Eng_train, Eng_val, Eng_test, deltar_train, deltar_val, deltar_test)
+    
+def Score2D(score1, score2, true=None):
+    
+    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2,3,figsize=[14,8])
+    axes = [ax1, ax2, ax3, ax4, ax5, ax6]
+    tics = [0., .2, .4, .6, .8, 1.0]
+    labs = ['$\eta$ < .5', '.5 < $\eta$ < 1.', '1. < $\eta$ < 1.5', '1.5 < $\eta$ < 2.', '2. < $\eta$ < 2.5', '2.5 < $\eta$ < 3.']
+    for i in range(len(axes)):
+        axes[i].set_ylim(0., 1.)
+        axes[i].set_xlim(0., 1.)
+        if true is not None:
+            h = axes[i].hist2d(score1[i][true[i]], score2[i][true[i]], cmap='YlOrBr')
+        else:
+            h = axes[i].hist2d(score1[i], score2[i], cmap='YlOrBr')
+        axes[i].set_xticks(tics)
+        axes[i].set_yticks(tics)
+        axes[i].set_title(labs[i])
+        plt.tight_layout()
+        fig.colorbar(h[-1], ax=axes[i])
+        #add big axis just for x/y labels
+        fig.add_subplot(111, frameon=False)
+        # hide tick and tick label of the big axis
+        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+        plt.xlabel("score 1")
+        plt.ylabel("score 2")
+    
+    plt.show()
+    
+    
+def focus_Score2D(score1, score2, truths):
+    #give it a specific eta range of score1&2 (or all of them) and the corresponding truths****
+    fig, (ax1, ax2, ax3) = plt.subplots(1,3,figsize=[18,6])
+    axes = [ax1, ax2, ax3]
+    tics = [0., .2, .4, .6, .8, 1.0]
+    labs = ['true pi0 mask', 'true pipm mask', 'true overlap mask']
+    for i in range(len(axes)):
+        axes[i].set_ylim(0., 1.)
+        axes[i].set_xlim(0., 1.)
+        h = axes[i].hist2d(score1[truths[i]], score2[truths[i]], cmap='YlOrBr')
+        axes[i].set_xticks(tics)
+        axes[i].set_yticks(tics)
+        axes[i].set_title(labs[i])
+        plt.tight_layout()
+        fig.colorbar(h[-1], ax=axes[i])
+        #add big axis just for x/y labels
+        fig.add_subplot(111, frameon=False)
+        # hide tick and tick label of the big axis
+        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+        plt.xlabel("score 1")
+        plt.ylabel("score 2")
+    
+    plt.show()
+    
+
+def makemask_CC(truthID, POI):
+    #specify the one particle of interest only
+    
+    selectedinds = []    
+
+    for i in range(len(truthID)): 
+        if (POI in truthID[i]): 
+            selectedinds.append(i)
+
+    flag = np.zeros(len(truthID))
+    flag[selectedinds] = 2
+    
+    mask = flag == 2
+    
+    return mask

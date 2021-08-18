@@ -55,6 +55,265 @@ def make_deltaR(flatID, flateta, flatphi, flatpt, flatm, clusE, partID1, partID2
 
     return longDeltaR #should be the same length!! **this is used to get it to be the same length as clus_e so that the selection will work on it.....
 
+def find_closest2(truthID_sel, trutheta_sel, truthphi_sel, truthpt_sel, truthmass_sel, clusE_sel, clusEta_sel, clusPhi_sel,  clusPt_sel, clusmass_sel, POI, part2, SAME=False): #POI stands for particle of interest
+    
+    print('Finding cluster closest to particle', POI)
+    #loop thru
+    mindist_indices = []
+    selec_inds = []
+    for i in range(len(trutheta_sel)): 
+        
+        #select the poi:
+        n_mask = truthID_sel[i] == POI
+        #and the other particle:
+        o_mask = truthID_sel[i] == part2
+
+        #then get deltaR for poi
+        partvec = ak.zip({
+            "pt": truthpt_sel[i][n_mask],
+            "eta": trutheta_sel[i][n_mask],
+            "phi": truthphi_sel[i][n_mask],
+            "mass": truthmass_sel[i][n_mask],
+        })
+
+        part4Dvec = ak.with_name(partvec, "Momentum4D")
+        
+        #and the other particle:
+        partvec2 = ak.zip({
+            "pt": truthpt_sel[i][o_mask],
+            "eta": trutheta_sel[i][o_mask],
+            "phi": truthphi_sel[i][o_mask],
+            "mass": truthmass_sel[i][o_mask],
+        })
+
+        part4Dvec2 = ak.with_name(partvec2, "Momentum4D") 
+        
+        #and for the cluster
+        deltaR = []
+        deltaR2 = []
+        for j in range(len(clusEta_sel[i])):
+            clusvec = ak.zip({
+                "pt": clusPt_sel[i][j],
+                "eta": clusEta_sel[i][j],
+                "phi": clusPhi_sel[i][j],
+                "mass": clusmass_sel[i][j]})
+            clus4Dvec = ak.with_name(clusvec, "Momentum4D")
+
+            deltaR.append(part4Dvec.deltaR(clus4Dvec))
+            deltaR2.append(part4Dvec2.deltaR(clus4Dvec))
+            if deltaR == []:
+                print('exception: empty deltaR') 
+                print(part4Dvec, clus4Dvec, part4Dvec.deltaR(clus4Dvec), deltaR, i, j)
+                
+            ind = np.argmin(np.array(ak.flatten(deltaR)))
+            ind2 = np.argmin(np.array(ak.flatten(deltaR2)))
+            
+        if (ind == ind2) == SAME:
+            selec_inds.append(i)
+            mindist_indices.append(ind)
+    
+    print(len(mindist_indices))
+    print('selec inds', len(selec_inds))
+    #probably janky but use only the ones that were in mindist
+    truthID_sel_cco = []
+    trutheta_sel_cco = [] #also removes all the events/truth particles in the events with no clusters
+    truthphi_sel_cco = []
+    truthpt_sel_cco = []
+    truthmass_sel_cco = []
+    clusE_sel_cco = []
+    clusEta_sel_cco =[]
+    clusPhi_sel_cco = []
+    clusPt_sel_cco = []
+    clusmass_sel_cco = []
+    mindist_inds_cco = []
+    for i in selec_inds: 
+        truthID_sel_cco.append(truthID_sel[i])
+        trutheta_sel_cco.append(trutheta_sel[i])
+        truthphi_sel_cco.append(truthphi_sel[i])
+        truthpt_sel_cco.append(truthpt_sel[i])
+        truthmass_sel_cco.append(truthmass_sel[i])
+        clusE_sel_cco.append(clusE_sel[i])
+        clusEta_sel_cco.append(clusEta_sel[i])
+        clusPhi_sel_cco.append(clusPhi_sel[i])
+        clusPt_sel_cco.append(clusPt_sel[i])
+        clusmass_sel_cco.append(clusmass_sel[i])
+        #mindist_inds_cco.append(mindist_indices[i])
+    
+    #remove the empty ones
+    mindist_indices_full = []
+    truthID_sel_full = []
+    trutheta_sel_full = [] #also removes all the events/truth particles in the events with no clusters
+    truthphi_sel_full = []
+    truthpt_sel_full = []
+    truthmass_sel_full = []
+    clusE_sel_full = []
+    clusEta_sel_full =[]
+    clusPhi_sel_full = []
+    clusPt_sel_full = []
+    clusmass_sel_full = []
+    
+    full_inds = []
+    for i in range(len(clusEta_sel_cco)): 
+        if len(clusEta_sel_cco[i]) != 0: 
+            mindist_indices_full.append(mindist_indices[i])
+            truthID_sel_full.append(truthID_sel_cco[i])
+            trutheta_sel_full.append(trutheta_sel_cco[i])
+            truthphi_sel_full.append(truthphi_sel_cco[i])
+            truthpt_sel_full.append(truthpt_sel_cco[i])
+            truthmass_sel_full.append(truthmass_sel_cco[i])
+            clusE_sel_full.append(clusE_sel_cco[i])
+            clusEta_sel_full.append(clusEta_sel_cco[i])
+            clusPhi_sel_full.append(clusPhi_sel_cco[i])
+            clusPt_sel_full.append(clusPt_sel_cco[i])
+            clusmass_sel_full.append(clusmass_sel_cco[i])
+            full_inds.append(selec_inds[i])
+      
+   # print(len(mindist_indices_full), mindist_indices_full)
+    clusEta_closest = []
+    clusE_closest = [] #select only the closest clusters
+    clusPhi_closest = []
+    clusPt_closest = []
+    clusmass_closest = []
+    for i in range(len(clusEta_sel_full)):
+        clusEta_closest.append(clusEta_sel_full[i][mindist_indices_full[i]])
+        clusE_closest.append(clusE_sel_full[i][mindist_indices_full[i]])
+        clusPhi_closest.append(clusPhi_sel_full[i][mindist_indices_full[i]])
+        clusPt_closest.append(clusPt_sel_full[i][mindist_indices_full[i]])
+        clusmass_closest.append(clusmass_sel_full[i][mindist_indices_full[i]])
+       
+    print('Closest clusters found.')
+    return (truthID_sel_full, trutheta_sel_full, truthphi_sel_full, truthpt_sel_full, truthmass_sel_full, ak.Array(clusE_closest), ak.Array(clusEta_closest), ak.Array(clusPhi_closest), ak.Array(clusPt_closest), ak.Array(clusmass_closest), full_inds, mindist_indices_full)
+
+def find_closest_rho(truthID_sel, trutheta_sel, truthphi_sel, truthpt_sel, truthmass_sel, clusE_sel, clusEta_sel, clusPhi_sel, clusPt_sel, clusmass_sel, SAME = False): #I knowww I'm lazy I should turn these all into one function... oh well
+    
+    print('Finding cluster closest to particle', 111)
+    #loop thru
+    mindist_indices = []
+    selec_inds = []
+    for i in range(len(trutheta_sel)): 
+        
+        #select the poi:
+        n_mask = truthID_sel[i] == 111
+        #and the other particle:
+        o_mask = np.logical_or(truthID_sel[i] == 211, truthID_sel[i] == -211)
+
+        print(o_mask)
+        #then get deltaR for poi
+        partvec = ak.zip({
+            "pt": truthpt_sel[i][n_mask],
+            "eta": trutheta_sel[i][n_mask],
+            "phi": truthphi_sel[i][n_mask],
+            "mass": truthmass_sel[i][n_mask],
+        })
+
+        part4Dvec = ak.with_name(partvec, "Momentum4D")
+        
+        #and the other particle:
+        partvec2 = ak.zip({
+            "pt": truthpt_sel[i][o_mask],
+            "eta": trutheta_sel[i][o_mask],
+            "phi": truthphi_sel[i][o_mask],
+            "mass": truthmass_sel[i][o_mask],
+        })
+
+        part4Dvec2 = ak.with_name(partvec2, "Momentum4D") 
+        
+        #and for the cluster
+        deltaR = []
+        deltaR2 = []
+        for j in range(len(clusEta_sel[i])):
+            clusvec = ak.zip({
+                "pt": clusPt_sel[i][j],
+                "eta": clusEta_sel[i][j],
+                "phi": clusPhi_sel[i][j],
+                "mass": clusmass_sel[i][j]})
+            clus4Dvec = ak.with_name(clusvec, "Momentum4D")
+
+            deltaR.append(part4Dvec.deltaR(clus4Dvec))
+            deltaR2.append(part4Dvec2.deltaR(clus4Dvec))
+            if deltaR == []:
+                print('exception: empty deltaR') 
+                print(part4Dvec, clus4Dvec, part4Dvec.deltaR(clus4Dvec), deltaR, i, j)
+                
+            ind = np.argmin(np.array(ak.flatten(deltaR)))
+            ind2 = np.argmin(np.array(ak.flatten(deltaR2)))
+            
+        if (ind == ind2) == SAME: #only change lol; so if they are equal and you want to exclude those, then leave same as false, but if you do want the cluster to be the same just set same to true 
+            selec_inds.append(i)
+            mindist_indices.append(ind)
+    
+    print(len(mindist_indices))
+    print('selec inds', len(selec_inds))
+    #probably janky but use only the ones that were in mindist
+    truthID_sel_cco = []
+    trutheta_sel_cco = [] #also removes all the events/truth particles in the events with no clusters
+    truthphi_sel_cco = []
+    truthpt_sel_cco = []
+    truthmass_sel_cco = []
+    clusE_sel_cco = []
+    clusEta_sel_cco =[]
+    clusPhi_sel_cco = []
+    clusPt_sel_cco = []
+    clusmass_sel_cco = []
+    mindist_inds_cco = []
+    for i in selec_inds: 
+        truthID_sel_cco.append(truthID_sel[i])
+        trutheta_sel_cco.append(trutheta_sel[i])
+        truthphi_sel_cco.append(truthphi_sel[i])
+        truthpt_sel_cco.append(truthpt_sel[i])
+        truthmass_sel_cco.append(truthmass_sel[i])
+        clusE_sel_cco.append(clusE_sel[i])
+        clusEta_sel_cco.append(clusEta_sel[i])
+        clusPhi_sel_cco.append(clusPhi_sel[i])
+        clusPt_sel_cco.append(clusPt_sel[i])
+        clusmass_sel_cco.append(clusmass_sel[i])
+        #mindist_inds_cco.append(mindist_indices[i])
+    
+    #remove the empty ones
+    mindist_indices_full = []
+    truthID_sel_full = []
+    trutheta_sel_full = [] #also removes all the events/truth particles in the events with no clusters
+    truthphi_sel_full = []
+    truthpt_sel_full = []
+    truthmass_sel_full = []
+    clusE_sel_full = []
+    clusEta_sel_full =[]
+    clusPhi_sel_full = []
+    clusPt_sel_full = []
+    clusmass_sel_full = []
+    
+    full_inds = []
+    for i in range(len(clusEta_sel_cco)): 
+        if len(clusEta_sel_cco[i]) != 0: 
+            mindist_indices_full.append(mindist_indices[i])
+            truthID_sel_full.append(truthID_sel_cco[i])
+            trutheta_sel_full.append(trutheta_sel_cco[i])
+            truthphi_sel_full.append(truthphi_sel_cco[i])
+            truthpt_sel_full.append(truthpt_sel_cco[i])
+            truthmass_sel_full.append(truthmass_sel_cco[i])
+            clusE_sel_full.append(clusE_sel_cco[i])
+            clusEta_sel_full.append(clusEta_sel_cco[i])
+            clusPhi_sel_full.append(clusPhi_sel_cco[i])
+            clusPt_sel_full.append(clusPt_sel_cco[i])
+            clusmass_sel_full.append(clusmass_sel_cco[i])
+            full_inds.append(selec_inds[i])
+      
+   # print(len(mindist_indices_full), mindist_indices_full)
+    clusEta_closest = []
+    clusE_closest = [] #select only the closest clusters
+    clusPhi_closest = []
+    clusPt_closest = []
+    clusmass_closest = []
+    for i in range(len(clusEta_sel_full)):
+        clusEta_closest.append(clusEta_sel_full[i][mindist_indices_full[i]])
+        clusE_closest.append(clusE_sel_full[i][mindist_indices_full[i]])
+        clusPhi_closest.append(clusPhi_sel_full[i][mindist_indices_full[i]])
+        clusPt_closest.append(clusPt_sel_full[i][mindist_indices_full[i]])
+        clusmass_closest.append(clusmass_sel_full[i][mindist_indices_full[i]])
+       
+    print('Closest clusters found.')
+    return (truthID_sel_full, trutheta_sel_full, truthphi_sel_full, truthpt_sel_full, truthmass_sel_full, ak.Array(clusE_closest), ak.Array(clusEta_closest), ak.Array(clusPhi_closest), ak.Array(clusPt_closest), ak.Array(clusmass_closest), full_inds, mindist_indices_full)
+
 
 def find_closest(truthID_sel, trutheta_sel, truthphi_sel, truthpt_sel, truthmass_sel, clusE_sel, clusEta_sel, clusPhi_sel,  clusPt_sel, clusmass_sel, POI): #POI stands for particle of interest
     
@@ -63,10 +322,10 @@ def find_closest(truthID_sel, trutheta_sel, truthphi_sel, truthpt_sel, truthmass
     mindist_indices = []
     for i in range(len(trutheta_sel)): 
         
-        #select the neutron:
+        #select the poi:
         n_mask = truthID_sel[i] == POI
 
-        #then get deltaR for n
+        #then get deltaR for poi
         partvec = ak.zip({
             "pt": truthpt_sel[i][n_mask],
             "eta": trutheta_sel[i][n_mask],

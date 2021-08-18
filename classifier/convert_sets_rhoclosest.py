@@ -13,9 +13,9 @@ import graph_util_splitdelta as gu
 #data_path = '/Users/swiatlow/Data/caloml/graph_data/'
 data_path = '/fast_scratch/atlas_images/v01-45/'
 
-del_list = [data_path+ 'delta_medium.root']
+rho_list = [data_path+ 'rho_medium.root']
 
-def convertFile(filename, deltamask, outname, partID1, partID2):
+def convertFile(filename, mask, outname):
     #this is the regular one, should still work for any of them.
     print('Working on {}'.format(filename))
     
@@ -28,14 +28,14 @@ def convertFile(filename, deltamask, outname, partID1, partID2):
     # should I remove things over 2000?
     
     #need notflat E for deltaR here -note this isn't needed for closest cluster below
-    notflatE = tree.arrays('cluster_E').cluster_E[deltamask]
+    notflatE = tree.arrays('cluster_E').cluster_E[mask]
     
     #all the stuff for deltaR:
-    truID = gu.loadVectorBranchFlat('truthPartPdgId', tree, deltamask)
-    trueta = gu.loadVectorBranchFlat('truthPartEta', tree, deltamask)
-    truphi = gu.loadVectorBranchFlat('truthPartPhi', tree, deltamask)
-    trupt = gu.loadVectorBranchFlat('truthPartPt', tree, deltamask)
-    trum = gu.loadVectorBranchFlat('truthPartMass', tree, deltamask)
+    truID = gu.loadVectorBranchFlat('truthPartPdgId', tree, mask)
+    trueta = gu.loadVectorBranchFlat('truthPartEta', tree, mask)
+    truphi = gu.loadVectorBranchFlat('truthPartPhi', tree, mask)
+    trupt = gu.loadVectorBranchFlat('truthPartPt', tree, mask)
+    trum = gu.loadVectorBranchFlat('truthPartMass', tree, mask)
     
     deltaR = gu.make_deltaR(truID, trueta, truphi, trupt, trum, notflatE, partID1, partID2)
     
@@ -84,7 +84,7 @@ def convertFile(filename, deltamask, outname, partID1, partID2):
     np.savez(outname, X=X, clus_eta=clus_eta[selection], clus_e=clus_e[selection], clus_pt=clus_pt[selection], clus_e_t=clus_e_t[selection], deltaR = np.array(deltaR[selection])) #maybe?? mayeb????? it doesn't matter if I don't use the selection???
     print('Done! {}'.format(outname))
 
-    
+
 def convertFile_closestonly(filename, deltamask, outname, partID1, partID2):
     #partID1 should be the particle of interest
     print('Working on {}'.format(filename))
@@ -185,7 +185,7 @@ def convertFile_closestonly(filename, deltamask, outname, partID1, partID2):
     
     np.savez(outname, X=X, clus_eta=clus_eta[selection], clus_e=clus_e[selection], clus_pt=clus_pt[selection], clus_e_t=clus_e_t[selection], deltaR = np.array(deltaR[selection])) 
     print('Done! {}'.format(outname))
-    
+
 
 def doit(mask, outname, partID1, partID2):
     for del_file in del_list:
